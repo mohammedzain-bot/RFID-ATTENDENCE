@@ -1,6 +1,6 @@
 import { DashboardStats, AttendanceRecord, Student, SerialPortInfo, HardwareStatus } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' && window.location.port !== '5000' ? 'http://localhost:5000' : '');
 const API_BASE = `${BASE_URL}/api`;
 
 export const api = {
