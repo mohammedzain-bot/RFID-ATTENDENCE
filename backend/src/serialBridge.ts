@@ -80,7 +80,7 @@ export async function connectPort(portPath: string, baudRate: number = CONFIG.BA
       autoOpen: false
     });
 
-    activeParser = activePort.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+    activeParser = activePort.pipe(new ReadlineParser({ delimiter: '\n' }));
 
     return new Promise((resolve) => {
       activePort!.open((err) => {
