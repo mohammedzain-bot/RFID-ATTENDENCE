@@ -149,6 +149,7 @@ function setupSerialListeners() {
     const line = rawLine.trim();
     if (!line) return;
 
+    console.log('>>> [SERIAL RX]:', line);
     broadcastSerialLog(`RX: ${line}`, 'rx');
 
     // Handle Arduino status or RFID scan line
@@ -159,16 +160,16 @@ function setupSerialListeners() {
       // Matches user's exact Arduino sketch output format: "RFID UID: 8A:B9:D6:05"
       const uid = line.replace('RFID UID:', '').trim();
       handleIncomingRFID(uid);
-    } else if (line.includes('RFID Reader Ready') || line.includes('Tap an RFID card') || line.startsWith('STATUS:READY')) {
+    } else if (line.includes('RFID Reader') || line.includes('Tap an RFID card') || line.startsWith('STATUS:READY')) {
       hardwareStatus.state = 'waiting';
       broadcastHardwareStatus(hardwareStatus);
       broadcastSerialLog('🟢 Arduino MFRC522 Reader Ready! Waiting for card...', 'info');
-    } else if (line.startsWith('STATUS:READER_ERROR')) {
+    } else if (line.startsWith('STATUS:READER_ERROR') || line.includes('ERROR:')) {
       broadcastSerialLog(`⚠️ Hardware warning: ${line}`, 'error');
     } else {
       // Regex check for any colon-separated UID pattern in the line (e.g. "8A:B9:D6:05")
       const uidMatch = line.match(/([0-9A-Fa-f]{2}:){3,9}[0-9A-Fa-f]{2}/);
-      if (uidMatch && !line.includes('Students registered')) {
+      if (uidMatch && !line.includes('Students Registered') && !line.includes('Students registered')) {
         handleIncomingRFID(uidMatch[0]);
       }
     }
@@ -192,6 +193,7 @@ function setupSerialListeners() {
 
 function handleIncomingRFID(rawUid: string) {
   const uid = rawUid.toUpperCase().trim();
+  console.log('>>> [PROCESSING INCOMING RFID UID]:', uid);
   const now = new Date();
 
   hardwareStatus.lastScanTime = now.toLocaleTimeString();
@@ -208,8 +210,23 @@ function handleIncomingRFID(rawUid: string) {
     }
   }, 3000);
 
-  // Process scan through main business logic
+  // Process scan through main business logic locally
   processRFIDScan(uid, 'hardware');
+
+  // Also relay scan to deployed Render cloud backend so the Vercel website updates live!
+  const cloudUrl = process.env.CLOUD_RELAY_URL || 'https://rfid-attendence-m6qi.onrender.com';
+  fetch(`${cloudUrl}/api/rfid/scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid })
+  })
+    .then(r => r.json())
+    .then(data => {
+      console.log('>>> [CLOUD RELAY SUCCESS]:', data.message || 'Synced to Vercel/Render');
+    })
+    .catch(err => {
+      console.log('>>> [CLOUD RELAY FAILED]:', err.message);
+    });
 }
 
 let autoRetryTimer: NodeJS.Timeout | null = null;

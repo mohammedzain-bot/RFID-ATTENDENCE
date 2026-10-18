@@ -1,83 +1,138 @@
 /*
-  RFID Attendance System - Arduino Sketch v2
-  Works with MFRC522 + Arduino Uno
+  ==============================================================
+  RFID STUDENT ATTENDANCE SYSTEM - ARDUINO UNO + MFRC522
+  ==============================================================
   
-  WIRING:
-    MFRC522 SDA  (pin 1)  --> Arduino Pin 10
-    MFRC522 SCK  (pin 2)  --> Arduino Pin 13
-    MFRC522 MOSI (pin 3)  --> Arduino Pin 11
-    MFRC522 MISO (pin 4)  --> Arduino Pin 12
-    MFRC522 IRQ  (pin 5)  --> NOT CONNECTED
-    MFRC522 GND  (pin 6)  --> Arduino GND
-    MFRC522 RST  (pin 7)  --> Arduino Pin 9
-    MFRC522 3.3V (pin 8)  --> Arduino 3.3V  *** NOT 5V ***
+  WIRING GUIDE:
+  --------------------------------------------------------------
+  MFRC522 Pin       Arduino Uno Pin       Notes
+  --------------------------------------------------------------
+  SDA (SS)     -->  Digital Pin 10        SPI Slave Select
+  SCK          -->  Digital Pin 13        SPI Clock
+  MOSI         -->  Digital Pin 11        SPI Master Out
+  MISO         -->  Digital Pin 12        SPI Master In
+  IRQ          -->  (NOT CONNECTED)       Leave empty
+  GND          -->  GND                   Ground
+  RST          -->  Digital Pin 9         Reset
+  3.3V (VCC)   -->  3.3V Pin              *** NEVER USE 5V ***
+  --------------------------------------------------------------
 */
 
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define SS_PIN  10
+#define SS_PIN 10
 #define RST_PIN 9
+#define LED_PIN 13  // Onboard LED for scan indicator
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
+// Registered Students for local verification
+struct Student {
+  String uid;
+  String name;
+  String studentId;
+  String studentClass;
+};
+
+Student students[] = {
+  {"8A:B9:D6:05", "Rahul Kumar",  "STU001", "10-A"},
+  {"0D:26:AA:04", "Ananya Nair",  "STU002", "10-A"},
+  {"12:34:56:78", "Arjun Menon",  "STU003", "10-B"},
+  {"AB:CD:EF:12", "Meera Joseph", "STU004", "10-B"}
+};
+
+const int studentCount = 4;
+
 void setup() {
   Serial.begin(9600);
-  while (!Serial);  // Wait for serial port to open
-  
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+
+  // Initialize SPI bus and MFRC522
   SPI.begin();
   mfrc522.PCD_Init();
   delay(100);
-  
-  // Boost antenna gain to MAX for better detection
+
+  // Set maximum antenna sensitivity
   mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max);
 
-  // Print version to verify MFRC522 is wired correctly
-  byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
-  Serial.println("================================");
-  Serial.println("     RFID ATTENDANCE SYSTEM");
-  Serial.println("================================");
-  
-  if (v == 0x00 || v == 0xFF) {
-    Serial.println("ERROR: MFRC522 not detected! Check wiring.");
-    Serial.println("STATUS:READER_ERROR");
-    while (true); // Stop here - wiring is wrong
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("     RFID ATTENDANCE SYSTEM READY       ");
+  Serial.println("========================================");
+
+  // Test communication with MFRC522 chip
+  byte version = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+  if (version == 0x00 || version == 0xFF) {
+    Serial.println("WARNING: MFRC522 reader not detected!");
+    Serial.println("Please check wire connections (especially 3.3V & GND).");
+  } else {
+    Serial.print("Reader Firmware: 0x");
+    Serial.println(version, HEX);
+    Serial.println("RFID Reader Initialized Successfully.");
   }
-  
-  Serial.print("MFRC522 Version: 0x");
-  Serial.println(v, HEX);
-  Serial.println("RFID Reader Ready!");
-  Serial.println("Students registered: 4");
-  Serial.println("Tap an RFID card...");
+
+  Serial.print("Students Registered in Memory: ");
+  Serial.println(studentCount);
+  Serial.println("Tap an RFID card to scan attendance...");
+  Serial.println("----------------------------------------");
 }
 
 void loop() {
-  // Reset the loop if no new card present
+  // Look for new card
   if (!mfrc522.PICC_IsNewCardPresent()) {
     return;
   }
 
-  // Select one of the cards
+  // Read card serial UID
   if (!mfrc522.PICC_ReadCardSerial()) {
     return;
   }
 
-  // Build UID string in format XX:XX:XX:XX
-  String uid = "";
+  // Blink onboard LED to indicate card detected
+  digitalWrite(LED_PIN, HIGH);
+
+  // Format UID to hex string: XX:XX:XX:XX
+  String cardUid = "";
   for (byte i = 0; i < mfrc522.uid.size; i++) {
-    if (mfrc522.uid.uidByte[i] < 0x10) uid += "0";
-    uid += String(mfrc522.uid.uidByte[i], HEX);
-    if (i < mfrc522.uid.size - 1) uid += ":";
+    if (mfrc522.uid.uidByte[i] < 0x10) cardUid += "0";
+    cardUid += String(mfrc522.uid.uidByte[i], HEX);
+    if (i < mfrc522.uid.size - 1) cardUid += ":";
   }
-  uid.toUpperCase();
+  cardUid.toUpperCase();
 
-  // Output UID — server reads this line
+  // Print in the exact format the web backend reads:
   Serial.print("RFID UID: ");
-  Serial.println(uid);
+  Serial.println(cardUid);
 
-  // Halt PICC and stop encryption
+  // Search if UID matches any known student
+  bool matched = false;
+  for (int i = 0; i < studentCount; i++) {
+    if (students[i].uid.equalsIgnoreCase(cardUid)) {
+      Serial.print("STUDENT: ");
+      Serial.print(students[i].name);
+      Serial.print(" | ID: ");
+      Serial.print(students[i].studentId);
+      Serial.print(" | CLASS: ");
+      Serial.println(students[i].studentClass);
+      matched = true;
+      break;
+    }
+  }
+
+  if (!matched) {
+    Serial.println("STATUS: Unregistered Card Scanned");
+  }
+
+  // Turn off onboard LED
+  delay(150);
+  digitalWrite(LED_PIN, LOW);
+
+  // Halt card and stop encryption
   mfrc522.PICC_HaltA();
   mfrc522.PCD_StopCrypto1();
 
-  delay(2000); // 2 second cooldown between scans
+  // Short delay so it doesn't scan the same card multiple times in 1 second
+  delay(1500);
 }
