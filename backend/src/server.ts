@@ -44,7 +44,17 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve frontend static files if built
-const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+import fs from 'fs';
+
+const candidatePaths = [
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(__dirname, '../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), '../frontend/dist')
+];
+
+const frontendDist = candidatePaths.find(p => fs.existsSync(p)) || candidatePaths[0];
+console.log(`Serving frontend static files from: ${frontendDist} (exists: ${fs.existsSync(frontendDist)})`);
 app.use(express.static(frontendDist));
 
 // SPA fallback middleware

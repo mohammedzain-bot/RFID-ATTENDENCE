@@ -2,9 +2,12 @@
 node_modules/
 */node_modules/
 
-# Production builds
-dist/
-*/dist/
+# Backend builds (rebuilt on server)
+backend/dist/
+
+# Keep compiled production frontend bundle so Render/hosts serve it immediately
+!frontend/dist/
+!frontend/dist/**
 
 # Environment variables
 .env

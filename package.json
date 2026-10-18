@@ -1,0 +1,12 @@
+{
+  "name": "rfid-attendance-management",
+  "version": "1.0.0",
+  "description": "RFID Student Attendance Management System",
+  "scripts": {
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install && npm --prefix backend run build",
+    "start": "node backend/dist/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
