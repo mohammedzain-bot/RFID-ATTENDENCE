@@ -47,8 +47,11 @@ app.get('/api/health', (req, res) => {
 import fs from 'fs';
 
 const candidatePaths = [
+  path.resolve(__dirname, 'public'),
+  path.resolve(__dirname, '../public'),
   path.resolve(__dirname, '../../frontend/dist'),
   path.resolve(__dirname, '../frontend/dist'),
+  path.resolve(process.cwd(), 'public'),
   path.resolve(process.cwd(), 'frontend/dist'),
   path.resolve(process.cwd(), '../frontend/dist')
 ];
