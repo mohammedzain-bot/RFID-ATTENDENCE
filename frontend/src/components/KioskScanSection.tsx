@@ -339,15 +339,52 @@ export const KioskScanSection: React.FC<KioskScanSectionProps> = ({
 
             </div>
           ) : (
-            /* Unregistered Card Alert Card */
-            <div className="p-8 rounded-2xl bg-red-950/20 border border-red-500/30 text-center">
-              <ShieldAlert className="w-16 h-16 text-red-400 mx-auto mb-3 animate-bounce" />
-              <h4 className="text-xl font-bold text-white mb-1">Unrecognized Card Scanned</h4>
-              <p className="text-sm text-red-300 max-w-md mx-auto mb-4">
-                Card UID <span className="font-mono font-bold bg-red-500/20 px-2 py-0.5 rounded text-white">{activeScan.uid}</span> is not linked to any registered student in the database.
+            /* Unregistered Card Alert Card with Quick-Assign */
+            <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-amber-500/10 to-dark-900 border border-amber-500/30 text-center animate-in fade-in zoom-in-95">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto mb-3">
+                <Radio className="w-8 h-8 animate-pulse" />
+              </div>
+              <h4 className="text-xl font-bold text-white mb-1">New RFID Card Detected</h4>
+              <p className="text-sm text-slate-300 max-w-md mx-auto mb-4">
+                Card UID <span className="font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded">{activeScan.uid}</span> is ready to be linked.
               </p>
-              <div className="inline-flex items-center space-x-2 text-xs text-slate-400 bg-white/5 px-4 py-2 rounded-xl border border-white/10">
-                <span>Tip: Go to <strong>Students</strong> section to register this RFID card.</span>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      // Fetch students to find STU001 or first student
+                      const list = await api.getStudents();
+                      const target = list.find((s: any) => s.student_id === 'STU001') || list[0];
+                      if (target) {
+                        await api.assignRfid(target.id, activeScan.uid);
+                        // Trigger immediate scan
+                        await api.simulateScan(activeScan.uid);
+                      }
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-accent-600 to-indigo-600 hover:from-accent-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-lg shadow-accent-600/30 flex items-center space-x-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Assign to Rahul Kumar (STU001)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveScan(null);
+                    if (onClearScan) onClearScan();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-semibold transition-all border border-white/10"
+                >
+                  Dismiss / Scan Again
+                </button>
+              </div>
+
+              <div className="mt-4 text-xs text-slate-400">
+                <span>Want to link to a different student? Open the <strong>Students</strong> tab to assign to anyone.</span>
               </div>
             </div>
           )}
