@@ -55,8 +55,8 @@ export const KioskScanSection: React.FC<KioskScanSectionProps> = ({
       soundEffects.playError();
     }
 
-    // Auto-return countdown (5 seconds)
-    setCountdown(5);
+    // Auto-return countdown (15 seconds so user has time to view student details)
+    setCountdown(15);
   }, [lastScan]);
 
   // Countdown timer to return to "Ready to Scan"
