@@ -145,11 +145,33 @@ export async function disconnectPort(): Promise<{ success: boolean; message: str
 function setupSerialListeners() {
   if (!activePort || !activeParser) return;
 
+  // Assert DTR and RTS so CH340 / Uno clone actively streams UART data
+  try {
+    activePort.set({ dtr: true, rts: true }, (err) => {
+      if (err) console.log('Notice setting DTR/RTS:', err.message);
+      else console.log('>>> [SERIAL DTR/RTS ASSERTED: TRUE]');
+    });
+  } catch {}
+
+  // 1. Raw port byte listener - captures any bytes arriving from hardware
+  activePort.on('data', (chunk: Buffer) => {
+    const raw = chunk.toString('utf8');
+    console.log('>>> [RAW HW BYTES]:', raw.replace(/\r/g, '\\r').replace(/\n/g, '\\n'));
+    broadcastSerialLog(`RAW: ${raw.trim()}`, 'rx');
+
+    // Extract any colon-separated UID pattern directly from raw chunk
+    const uidMatch = raw.match(/([0-9A-Fa-f]{2}:){3,9}[0-9A-Fa-f]{2}/);
+    if (uidMatch && !raw.includes('Students Registered') && !raw.includes('Students registered')) {
+      handleIncomingRFID(uidMatch[0]);
+    }
+  });
+
+  // 2. Line parser listener
   activeParser.on('data', (rawLine: string) => {
     const line = rawLine.trim();
     if (!line) return;
 
-    console.log('>>> [SERIAL RX]:', line);
+    console.log('>>> [SERIAL LINE RX]:', line);
     broadcastSerialLog(`RX: ${line}`, 'rx');
 
     // Handle Arduino status or RFID scan line
@@ -191,12 +213,22 @@ function setupSerialListeners() {
   });
 }
 
+let lastHandledUid = '';
+let lastHandledTime = 0;
+
 function handleIncomingRFID(rawUid: string) {
   const uid = rawUid.toUpperCase().trim();
-  console.log('>>> [PROCESSING INCOMING RFID UID]:', uid);
-  const now = new Date();
+  const now = Date.now();
+  if (uid === lastHandledUid && now - lastHandledTime < 1500) {
+    return; // debounce rapid double triggers
+  }
+  lastHandledUid = uid;
+  lastHandledTime = now;
 
-  hardwareStatus.lastScanTime = now.toLocaleTimeString();
+  console.log('>>> [PROCESSING INCOMING RFID UID]:', uid);
+  const nowDate = new Date();
+
+  hardwareStatus.lastScanTime = nowDate.toLocaleTimeString();
   hardwareStatus.lastScanUid = uid;
   hardwareStatus.totalHardwareScans += 1;
   hardwareStatus.state = 'connected'; // momentary activity
